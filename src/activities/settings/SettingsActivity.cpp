@@ -23,6 +23,7 @@
 #include "StatusBarSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -225,7 +226,7 @@ void SettingsActivity::toggleCurrentSetting() {
                              [this](const ActivityResult&) {
                                SETTINGS.saveToFile();
                                rebuildSettingsLists();
-                             });
+          });
       return;
     }
     const uint8_t totalValues = setting.enumStringValues.empty()
@@ -257,6 +258,24 @@ void SettingsActivity::toggleCurrentSetting() {
     } else {
       SETTINGS.*(setting.valuePtr) = currentValue + setting.valueRange.step;
     }
+  } else if (setting.type == SettingType::STRING && setting.stringOffset && setting.stringMaxLen > 0) {
+    char* strPtr = (char*)&SETTINGS + setting.stringOffset;
+    startActivityForResult(
+        std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, I18N.get(setting.nameId), strPtr,
+                                                setting.stringMaxLen - 1),
+        [this, stringOffset = setting.stringOffset,
+         stringMaxLen = setting.stringMaxLen](const ActivityResult& result) {
+          if (!result.isCancelled) {
+            const auto text = std::get<KeyboardResult>(result.data).text;
+            char* dest = (char*)&SETTINGS + stringOffset;
+            strncpy(dest, text.c_str(), stringMaxLen - 1);
+            dest[stringMaxLen - 1] = '\0';
+            SETTINGS.saveToFile();
+            rebuildSettingsLists();
+          }
+          requestUpdate();
+        });
+    return;
   } else if (setting.type == SettingType::ACTION) {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
@@ -393,6 +412,9 @@ void SettingsActivity::render(RenderLock&&) {
           } else if (value < setting.enumValues.size()) {
             valueText = I18N.get(setting.enumValues[value]);
           }
+        } else if (setting.type == SettingType::STRING && setting.stringOffset) {
+          const char* strPtr = (const char*)&SETTINGS + setting.stringOffset;
+          valueText = strPtr;
         } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
           if (setting.nameId == StrId::STR_TIME_TO_SLEEP) {
             char valueBuffer[32];

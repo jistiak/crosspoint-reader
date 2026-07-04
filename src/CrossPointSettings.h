@@ -242,6 +242,8 @@ class CrossPointSettings {
   char opdsServerUrl[128] = "";
   char opdsUsername[64] = "";
   char opdsPassword[64] = "";
+  // Project Gutenberg downloads folder on SD card (relative to root)
+  char gutenbergFolder[64] = "gutenberg";
   // Hide battery percentage
   uint8_t hideBatteryPercentage = HIDE_NEVER;
   // Long-press page turn button behavior
